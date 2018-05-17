@@ -18,5 +18,5 @@ func (u *LoginHandler) Handle(name string, engine string, service string, ctx *c
 	ctx.Response.SetJWTBody(map[string]interface{}{
 		"id": 11000,
 	})
-	return "ok"
+	return "Hello, World!"
 }
