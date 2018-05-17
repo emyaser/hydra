@@ -23,7 +23,7 @@ type Request struct {
 	Setting        *inputParams
 	CircuitBreaker *circuitBreakerParam //熔断处理
 	Http           *httpRequest
-	Ext            *extParams
+	*extParams
 }
 
 func newRequest() *Request {
@@ -34,29 +34,33 @@ func newRequest() *Request {
 		Setting:        &inputParams{},
 		CircuitBreaker: &circuitBreakerParam{inputParams: &inputParams{}},
 		Http:           &httpRequest{},
-		Ext:            &extParams{},
+		extParams:      &extParams{},
 	}
 }
 
-func (r *Request) reset(queryString IData, form IData, param IData, setting IData, ext map[string]interface{}) {
+func (r *Request) reset(ctx *Context, queryString IData, form IData, param IData, setting IData, ext map[string]interface{}) {
 	r.QueryString.data = queryString
 	r.Form.data = form
 	r.Param.data = param
 	r.Setting.data = setting
 	r.CircuitBreaker.inputParams.data = setting
 	r.CircuitBreaker.ext = ext
-	r.Ext.ext = ext
+	r.extParams.ext = ext
+	r.extParams.ctx = ctx
 	r.Http.ext = ext
 
 }
 
 //Bind 根据输入参数绑定对象
 func (r *Request) Bind(obj interface{}) error {
-	f := r.Ext.GetBindingFunc()
+	f := r.GetBindingFunc()
 	if err := f(obj); err != nil {
 		return err
 	}
 	val := reflect.ValueOf(obj)
+	if val.Kind() == reflect.Interface || val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
 	if val.Kind() != reflect.Struct {
 		return nil
 	}
@@ -69,7 +73,7 @@ func (r *Request) Bind(obj interface{}) error {
 
 //BindWith 根据输入参数绑定对象
 func (r *Request) BindWith(obj interface{}, contentType string) error {
-	f := r.Ext.GetBindWithFunc()
+	f := r.GetBindWithFunc()
 	if err := f(obj, contentType); err != nil {
 		return err
 	}
@@ -98,7 +102,7 @@ func (r *Request) Check(checker map[string][]string) (int, error) {
 
 //Body2Input 根据编码格式解码body参数，并更新input参数
 func (r *Request) Body2Input(encoding ...string) (map[string]string, error) {
-	body, err := r.Ext.GetBody(encoding...)
+	body, err := r.GetBody(encoding...)
 	if err != nil {
 		return nil, err
 	}
@@ -235,6 +239,6 @@ func (r *Request) clear() {
 	r.Setting.data = nil
 	r.CircuitBreaker.inputParams.data = nil
 	r.CircuitBreaker.ext = nil
-	r.Ext.ext = nil
+	r.extParams.ext = nil
 	r.Http.ext = nil
 }

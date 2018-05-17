@@ -1,19 +1,25 @@
 package context
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
+
+	"github.com/micro-plat/hydra/conf"
+	"github.com/micro-plat/lib4go/types"
 )
 
 type extParams struct {
 	ext map[string]interface{}
+	ctx *Context
 }
 
-func (w *extParams) Get(name string) (interface{}, bool) {
-	v, ok := w.ext[name]
-	return v, ok
-}
+// func (w *extParams) Get(name string) (interface{}, bool) {
+// 	v, ok := w.ext[name]
+// 	return v, ok
+// }
 func (w *extParams) GetMethod() string {
 	if m, ok := w.ext["__method_"].(string); ok {
 		return m
@@ -84,7 +90,42 @@ func (w *extParams) GetJWTBody() interface{} {
 	return w.ext["__jwt_"]
 }
 
+//GetJWTBody 获取jwt存储数据
+func (w *extParams) GetJWT(out interface{}) error {
+	jwt := w.ext["__jwt_"]
+	if jwt == nil || reflect.ValueOf(jwt).IsNil() {
+		return fmt.Errorf("未找到jwt,用户未登录")
+	}
+	switch v := jwt.(type) {
+	case string:
+		return json.Unmarshal([]byte(v), &out)
+	case map[string]interface{}:
+		return types.Map2Struct(v, out)
+	default:
+		buff, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		return json.Unmarshal(buff, out)
+	}
+}
+
 //GetUUID
 func (w *extParams) GetUUID() string {
 	return w.ext["__hydra_sid_"].(string)
+}
+
+//GetJWTConfig 获取jwt配置信息
+func (w *extParams) GetJWTConfig() (*conf.Auth, error) {
+	var auths conf.Authes
+	var jwt *conf.Auth
+	if _, err := w.ctx.GetContainer().GetSubObject("auth", &auths); err != nil && err != conf.ErrNoSetting {
+		err = fmt.Errorf("jwt配置有误:%v", err)
+		return nil, err
+	}
+	jwt, enable := auths["jwt"]
+	if !enable {
+		return nil, fmt.Errorf("jwt:%v", conf.ErrNoSetting)
+	}
+	return jwt, nil
 }

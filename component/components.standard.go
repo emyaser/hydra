@@ -98,29 +98,28 @@ func (r *StandardComponent) AddCustomerService(service string, h interface{}, gr
 
 //IsMicroService 是否是微服务
 func (r *StandardComponent) IsMicroService(service string) bool {
-	return r.IsCustomerService(service,MicroService)
+	return r.IsCustomerService(service, MicroService)
 }
 
 //IsAutoflowService 是否是自动流程服务
 func (r *StandardComponent) IsAutoflowService(service string) bool {
-	return r.IsCustomerService(service,AutoflowService)
+	return r.IsCustomerService(service, AutoflowService)
 }
 
 //IsPageService 是否是页面服务
 func (r *StandardComponent) IsPageService(service string) bool {
-	return r.IsCustomerService(service,PageService)
+	return r.IsCustomerService(service, PageService)
 }
 
 //IsCustomerService 是否是指定的分组服务
-func (r *StandardComponent) IsCustomerService(service string,group ...string) bool {
+func (r *StandardComponent) IsCustomerService(service string, group ...string) bool {
 	groups := r.GetGroups(service)
 	for _, v := range groups {
-		for _,g:=range group{
+		for _, g := range group {
 			if v == g {
 				return true
 			}
 		}
-		
 	}
 	return false
 }
@@ -333,9 +332,9 @@ func (r *StandardComponent) GetServices() []string {
 
 //GetGroupServices 根据分组获取服务
 func (r *StandardComponent) GetGroupServices(group ...string) []string {
-	srvs:=make([]string,0,4)
-	for _,g:=range group{
-		srvs=append(srvs,r.GroupServices[g]...)
+	srvs := make([]string, 0, 4)
+	for _, g := range group {
+		srvs = append(srvs, r.GroupServices[g]...)
 	}
 	return srvs
 }
@@ -371,12 +370,12 @@ func (r *StandardComponent) AddFallbackHandlers(f map[string]interface{}) {
 }
 
 //Handling 每次handle执行前执行
-func (r *StandardComponent) Handling(name string, method string, service string, c *context.Context) (rs interface{}) {
+func (r *StandardComponent) Handling(c *context.Context) (rs interface{}) {
 	return nil
 }
 
 //Handled 每次handle执行后执行
-func (r *StandardComponent) Handled(name string, method string, service string, c *context.Context) (rs interface{}) {
+func (r *StandardComponent) Handled(c *context.Context) (rs interface{}) {
 	return nil
 }
 
@@ -396,22 +395,21 @@ func (r *StandardComponent) GetHandler(engine string, service string, method str
 }
 
 //Handle 组件服务执行
-func (r *StandardComponent) Handle(name string, engine string, service string, c *context.Context) (rs interface{}) {
-	method := c.Request.Ext.GetMethod()
-	h, ok := r.GetHandler(engine, service, method)
+func (r *StandardComponent) Handle(c *context.Context) (rs interface{}) {
+	h, ok := r.GetHandler(c.Engine, c.Service, c.Request.GetMethod())
 	if !ok {
 		c.Response.SetStatus(404)
-		return fmt.Errorf("%s:未找到服务:%s", r.Name, service)
+		return fmt.Errorf("%s:未找到服务:%s", r.Name, c.Service)
 	}
-	if r.IsPageService(service){
+	if r.IsPageService(c.Service) {
 		c.Response.SetTextHTML()
 	}
 	switch handler := h.(type) {
 	case Handler:
-		rs = handler.Handle(name, engine, service, c)
+		rs = handler.Handle(c)
 	default:
 		c.Response.SetStatus(404)
-		rs = fmt.Errorf("未找到服务:%s", service)
+		rs = fmt.Errorf("未找到服务:%s", c.Service)
 	}
 	return
 }
@@ -427,17 +425,17 @@ func (r *StandardComponent) GetFallbackHandler(engine string, service string, me
 }
 
 //Fallback 降级处理
-func (r *StandardComponent) Fallback(name string, engine string, service string, c *context.Context) (rs interface{}) {
+func (r *StandardComponent) Fallback(c *context.Context) (rs interface{}) {
 	c.Response.SetStatus(404)
-	h, ok := r.GetFallbackHandler(engine, service, c.Request.Ext.GetMethod())
+	h, ok := r.GetFallbackHandler(c.Engine, c.Service, c.Request.GetMethod())
 	if !ok {
 		return ErrNotFoundService
 	}
 	switch handler := h.(type) {
 	case FallbackHandler:
-		rs = handler.Fallback(name, engine, service, c)
+		rs = handler.Fallback(c)
 	default:
-		rs = fmt.Errorf("未找到服务:%s", service)
+		rs = fmt.Errorf("未找到服务:%s", c.Service)
 	}
 	return
 }
@@ -465,7 +463,7 @@ func GetGroupName(serverType string) []string {
 	case "mqc", "cron":
 		return []string{AutoflowService}
 	case "web":
-		return []string{PageService,MicroService}
+		return []string{PageService, MicroService}
 	}
 	return []string{CustomerService}
 }
